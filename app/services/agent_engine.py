@@ -29,16 +29,24 @@ class AgentEngine:
         decisions = []
 
         for topic in topics:
+
+            # -----------------------------------------------------------
             # Memory check
+            # -----------------------------------------------------------
+
             already_seen = await self.memory.has_seen_topic(
                 agent_id=agent_id,
                 title=topic.title,
+                url=topic.source_url,
             )
 
             if already_seen:
                 continue
 
+            # -----------------------------------------------------------
             # Editorial judgment
+            # -----------------------------------------------------------
+
             decision = self.editorial_engine.evaluate(
                 topic=topic,
                 persona_domain=persona_domain,
@@ -46,7 +54,10 @@ class AgentEngine:
 
             decisions.append(decision)
 
+        # ---------------------------------------------------------------
         # Highest scoring acceptable topic first
+        # ---------------------------------------------------------------
+
         accepted = [
             decision
             for decision in decisions

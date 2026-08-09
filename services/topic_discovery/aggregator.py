@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Fallback limits (used only if settings values are absent or zero)
+# Fallback limits
 # ---------------------------------------------------------------------------
 
 DEFAULT_RSS_LIMIT = 10
@@ -59,13 +59,8 @@ async def fetch_all_topics(
     hackernews_limit: int | None = None,
     github_limit: int | None = None,
     arxiv_limit: int | None = None,
-    score_threshold: int = DEFAULT_SCORE_THRESHOLD,
+    score_threshold: int | None = None,
 ) -> list[dict[str, Any]]:
-    # Use settings as authoritative source; fall back to module defaults.
-    rss_limit = rss_limit or settings.RSS_LIMIT or DEFAULT_RSS_LIMIT
-    hackernews_limit = hackernews_limit or settings.HACKERNEWS_LIMIT or DEFAULT_HACKERNEWS_LIMIT
-    github_limit = github_limit or settings.GITHUB_LIMIT or DEFAULT_GITHUB_LIMIT
-    arxiv_limit = arxiv_limit or settings.ARXIV_LIMIT or DEFAULT_ARXIV_LIMIT
     """
     Fetch topics from all discovery sources concurrently.
 
@@ -99,6 +94,7 @@ async def fetch_all_topics(
 
         score_threshold:
             Minimum score required for a topic to be selected.
+            If omitted, settings.TOPIC_SCORE_THRESHOLD is used.
 
     Returns:
         List of selected and scored topic candidates.
@@ -106,23 +102,68 @@ async def fetch_all_topics(
 
     logger.info("Starting unified topic discovery.")
 
+    # -----------------------------------------------------------------------
+    # Use settings as the authoritative configuration source.
+    # Explicit function arguments take precedence.
+    # -----------------------------------------------------------------------
+
+    rss_limit = (
+        rss_limit
+        if rss_limit is not None
+        else settings.RSS_LIMIT or DEFAULT_RSS_LIMIT
+    )
+
+    hackernews_limit = (
+        hackernews_limit
+        if hackernews_limit is not None
+        else settings.HACKERNEWS_LIMIT or DEFAULT_HACKERNEWS_LIMIT
+    )
+
+    github_limit = (
+        github_limit
+        if github_limit is not None
+        else settings.GITHUB_LIMIT or DEFAULT_GITHUB_LIMIT
+    )
+
+    arxiv_limit = (
+        arxiv_limit
+        if arxiv_limit is not None
+        else settings.ARXIV_LIMIT or DEFAULT_ARXIV_LIMIT
+    )
+
+    score_threshold = (
+        score_threshold
+        if score_threshold is not None
+        else settings.TOPIC_SCORE_THRESHOLD
+    )
+
+    logger.info(
+        "Discovery configuration: "
+        "RSS=%d, HackerNews=%d, GitHub=%d, arXiv=%d, threshold=%d",
+        rss_limit,
+        hackernews_limit,
+        github_limit,
+        arxiv_limit,
+        score_threshold,
+    )
+
     try:
 
-        # ---------------------------------------------------------------
+        # -------------------------------------------------------------------
         # RSS is SYNCHRONOUS.
         #
         # fetch_all_rss_topics() returns a list directly.
-        # Therefore execute it in a background thread.
-        # ---------------------------------------------------------------
+        # Execute it in a background thread.
+        # -------------------------------------------------------------------
 
         rss_task = asyncio.to_thread(
             fetch_all_rss_topics,
             limit_per_source=rss_limit,
         )
 
-        # ---------------------------------------------------------------
+        # -------------------------------------------------------------------
         # These services are ASYNCHRONOUS.
-        # ---------------------------------------------------------------
+        # -------------------------------------------------------------------
 
         hackernews_task = fetch_hackernews_topics(
             limit=hackernews_limit,
@@ -136,9 +177,9 @@ async def fetch_all_topics(
             limit=arxiv_limit,
         )
 
-        # ---------------------------------------------------------------
+        # -------------------------------------------------------------------
         # Run all four discovery sources concurrently.
-        # ---------------------------------------------------------------
+        # -------------------------------------------------------------------
 
         results = await asyncio.gather(
             rss_task,
@@ -148,9 +189,9 @@ async def fetch_all_topics(
             return_exceptions=True,
         )
 
-        # ---------------------------------------------------------------
+        # -------------------------------------------------------------------
         # Source names corresponding to results above.
-        # ---------------------------------------------------------------
+        # -------------------------------------------------------------------
 
         source_names = [
             "RSS",
@@ -161,18 +202,18 @@ async def fetch_all_topics(
 
         all_topics: list[dict[str, Any]] = []
 
-        # ---------------------------------------------------------------
+        # -------------------------------------------------------------------
         # Process results from each source.
-        # ---------------------------------------------------------------
+        # -------------------------------------------------------------------
 
         for source_name, result in zip(
             source_names,
             results,
         ):
 
-            # -----------------------------------------------------------
+            # ---------------------------------------------------------------
             # One source may have failed.
-            # -----------------------------------------------------------
+            # ---------------------------------------------------------------
 
             if isinstance(result, Exception):
 
@@ -184,9 +225,9 @@ async def fetch_all_topics(
 
                 continue
 
-            # -----------------------------------------------------------
+            # ---------------------------------------------------------------
             # Every discovery service should return a list.
-            # -----------------------------------------------------------
+            # ---------------------------------------------------------------
 
             if not isinstance(result, list):
 
@@ -198,9 +239,9 @@ async def fetch_all_topics(
 
                 continue
 
-            # -----------------------------------------------------------
+            # ---------------------------------------------------------------
             # Add topics to unified collection.
-            # -----------------------------------------------------------
+            # ---------------------------------------------------------------
 
             logger.info(
                 "%s returned %d topics.",
@@ -210,9 +251,9 @@ async def fetch_all_topics(
 
             all_topics.extend(result)
 
-        # ---------------------------------------------------------------
-        # Deduplicate AFTER all four sources have been processed.
-        # ---------------------------------------------------------------
+        # -------------------------------------------------------------------
+        # Deduplicate AFTER all sources have been processed.
+        # -------------------------------------------------------------------
 
         logger.info(
             "Collected %d topics from all discovery sources.",
@@ -231,9 +272,9 @@ async def fetch_all_topics(
             len(all_topics) - len(unique_topics),
         )
 
-        # ---------------------------------------------------------------
+        # -------------------------------------------------------------------
         # Score and select topics.
-        # ---------------------------------------------------------------
+        # -------------------------------------------------------------------
 
         selected_topics = select_topics(
             unique_topics,
