@@ -28,6 +28,8 @@ from .arxiv import fetch_arxiv_topics
 from .deduplicator import deduplicate_topics
 from .scorer import select_topics
 
+from app.core.config import settings
+
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -37,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Default limits
+# Fallback limits (used only if settings values are absent or zero)
 # ---------------------------------------------------------------------------
 
 DEFAULT_RSS_LIMIT = 10
@@ -53,12 +55,17 @@ DEFAULT_SCORE_THRESHOLD = 50
 # ---------------------------------------------------------------------------
 
 async def fetch_all_topics(
-    rss_limit: int = DEFAULT_RSS_LIMIT,
-    hackernews_limit: int = DEFAULT_HACKERNEWS_LIMIT,
-    github_limit: int = DEFAULT_GITHUB_LIMIT,
-    arxiv_limit: int = DEFAULT_ARXIV_LIMIT,
+    rss_limit: int | None = None,
+    hackernews_limit: int | None = None,
+    github_limit: int | None = None,
+    arxiv_limit: int | None = None,
     score_threshold: int = DEFAULT_SCORE_THRESHOLD,
 ) -> list[dict[str, Any]]:
+    # Use settings as authoritative source; fall back to module defaults.
+    rss_limit = rss_limit or settings.RSS_LIMIT or DEFAULT_RSS_LIMIT
+    hackernews_limit = hackernews_limit or settings.HACKERNEWS_LIMIT or DEFAULT_HACKERNEWS_LIMIT
+    github_limit = github_limit or settings.GITHUB_LIMIT or DEFAULT_GITHUB_LIMIT
+    arxiv_limit = arxiv_limit or settings.ARXIV_LIMIT or DEFAULT_ARXIV_LIMIT
     """
     Fetch topics from all discovery sources concurrently.
 

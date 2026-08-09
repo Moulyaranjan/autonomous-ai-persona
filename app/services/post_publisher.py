@@ -20,12 +20,69 @@ class PostPublisher:
         text: str,
     ) -> Post:
 
+        breakdown = decision.score_breakdown or {}
+
+        ai_security_signals = breakdown.get(
+            "ai_security_signals",
+            [],
+        )
+
+        recency_label = breakdown.get(
+            "recency_label",
+            "Recency information was not available.",
+        )
+
+        source_credibility = breakdown.get(
+            "source_credibility",
+            0,
+        )
+
+        ai_tech_relevance = breakdown.get(
+            "ai_tech_relevance",
+            0,
+        )
+
+        ai_security_alignment = breakdown.get(
+            "ai_security_alignment",
+            0,
+        )
+
+        significance = breakdown.get(
+            "significance",
+            0,
+        )
+
+        # threshold = breakdown.get(
+        #     "threshold",
+        #     decision.score,
+        # )
+
+        if ai_security_signals:
+            security_reason = (
+                "The topic contains AI Security signals: "
+                + ", ".join(ai_security_signals)
+                + "."
+            )
+        else:
+            security_reason = (
+                "The topic passed the AI Security editorial gate."
+            )
+
         rationale = (
-            f"Selected candidate topic '{topic.title}' with editorial score "
-            f"{decision.score}/100. "
-            f"Current relevance: {decision.reason}. "
-            f"Selected over competing candidate topics in this cycle due to highest domain alignment "
-            f"and source credibility ({topic.source_name})."
+            f"Selected '{topic.title}' because it achieved an "
+            f"editorial score of {decision.score}/100 and passed "
+            f"Ada's AI Security publishing standards. "
+            f"AI/technology relevance contributed "
+            f"{ai_tech_relevance}/20 points, while AI Security "
+            f"alignment contributed {ai_security_alignment}/40 points. "
+            f"{security_reason} "
+            f"{recency_label}, making the topic relevant to the "
+            f"current publishing cycle. "
+            f"The source credibility score was "
+            f"{source_credibility}/10 and the significance score was "
+            f"{significance}/10. "
+            f"The topic was selected from the candidates that passed "
+            f"the discovery and editorial filters in this cycle."
         )
 
         sources = [topic.source_url] if topic.source_url else []
@@ -33,9 +90,16 @@ class PostPublisher:
         post = Post(
             agent_id=agent_id,
             topic_title=topic.title,
+            topic_url=topic.source_url,
             text=text,
             rationale=rationale,
             sources=json.dumps(sources),
+            source_name=topic.source_name,
+            source_published_at=topic.published_at,
+            editorial_score=decision.score,
+            score_breakdown=json.dumps(
+                decision.score_breakdown
+            ),
         )
 
         self.db.add(post)
@@ -43,4 +107,4 @@ class PostPublisher:
         await self.db.commit()
         await self.db.refresh(post)
 
-        return post
+        return post

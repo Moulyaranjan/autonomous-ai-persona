@@ -5,3 +5,5 @@ __pycache__/
 *.db
 .vscode/
 signalforge.db
+signalforge.db-shm
+signalforge.db-wal
