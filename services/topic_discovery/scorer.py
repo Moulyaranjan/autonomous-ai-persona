@@ -11,13 +11,13 @@ Pipeline position:
 
     Discovery Sources
           ↓
-      Aggregator
+       Aggregator
           ↓
       Deduplicator
           ↓
-        Scorer
+         Scorer
           ↓
-   Selected Topics
+    Selected Topics
 """
 
 from __future__ import annotations
@@ -40,6 +40,10 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_SELECTION_THRESHOLD = 50
 
+
+# ---------------------------------------------------------------------------
+# Relevance keywords
+# ---------------------------------------------------------------------------
 
 # Keywords indicating strong AI / technology relevance.
 HIGH_RELEVANCE_KEYWORDS = {
@@ -74,7 +78,17 @@ HIGH_RELEVANCE_KEYWORDS = {
 }
 
 
-# Keywords that indicate a potentially significant event.
+# ---------------------------------------------------------------------------
+# Significance keywords
+# ---------------------------------------------------------------------------
+
+# Keywords indicating a potentially significant technology event.
+#
+# Security-related terms are included because vulnerabilities, attacks,
+# exploits, prompt injection, jailbreaks, and security incidents are
+# important technology developments. This does NOT make the scorer
+# persona-specific; EditorialEngine remains responsible for deciding
+# whether a topic actually fits the active persona.
 SIGNIFICANCE_KEYWORDS = {
     "launch",
     "launched",
@@ -92,13 +106,34 @@ SIGNIFICANCE_KEYWORDS = {
     "funding",
     "security",
     "cybersecurity",
+    "cyber",
+    "vulnerability",
+    "vulnerabilities",
+    "attack",
+    "attacks",
+    "exploit",
+    "exploits",
+    "jailbreak",
+    "jailbreaks",
+    "prompt injection",
+    "model security",
+    "security flaw",
+    "security flaws",
+    "data breach",
+    "breach",
+    "incident",
     "update",
     "major",
+    "critical",
     "first",
     "open source",
     "opensource",
 }
 
+
+# ---------------------------------------------------------------------------
+# Audience interest keywords
+# ---------------------------------------------------------------------------
 
 # Keywords indicating strong audience interest.
 INTEREST_KEYWORDS = {
@@ -182,7 +217,12 @@ def _calculate_relevance_score(topic: dict[str, Any]) -> int:
     score += min(len(matched_keywords) * 5, 25)
 
     # Strong source-specific relevance.
-    source = _clean_text(topic.get("source", ""))
+    source = _clean_text(
+        topic.get(
+            "source",
+            topic.get("source_name", ""),
+        )
+    )
 
     if source in {
         "openai",
@@ -206,6 +246,11 @@ def _calculate_significance_score(topic: dict[str, Any]) -> int:
     Calculate how significant the topic appears.
 
     Maximum score: 25.
+
+    Security-related developments such as vulnerabilities,
+    attacks, exploits, jailbreaks, prompt injection, and
+    critical incidents are treated as meaningful technology
+    events without making this scorer persona-specific.
     """
 
     text = _topic_text(topic)
@@ -320,7 +365,7 @@ def score_topic(topic: dict[str, Any]) -> dict[str, Any]:
 
     Total score:
 
-        relevance   = 30
+        relevance    = 30
         significance = 25
         interest     = 25
         recency      = 20
@@ -459,6 +504,20 @@ if __name__ == "__main__":
             "source": "OpenAI",
             "published_at": "2026-08-08T10:00:00Z",
             "tags": ["ai", "openai", "llm"],
+        },
+        {
+            "title": (
+                "Critical prompt injection vulnerability "
+                "discovered in AI agents"
+            ),
+            "summary": (
+                "Researchers identified a new prompt injection "
+                "attack affecting autonomous AI agents."
+            ),
+            "url": "https://example.com/ai-security",
+            "source": "OpenAI",
+            "published_at": "2026-08-08T10:00:00Z",
+            "tags": ["ai", "security"],
         },
         {
             "title": "Local weather report",
